@@ -1,0 +1,61 @@
+# host_vars
+export PATRONI_HOSTS=/home/postgres/project_ha/env/patroni_hosts.txt
+export ETCD_HOSTS=$(cat /home/postgres/project_ha/env/etcd_hosts.txt);
+export PATRONI_IP=/home/postgres/project_ha/env/patroni_ip.txt
+export HOSTS=/home/postgres/project_ha/env/hosts;
+# rpm_vars
+export PATRONI_RPM=/home/postgres/project_ha/patroni_rpm;
+export POSTGRES_RPM=/home/postgres/project_ha/pgpro_${PG_VER}_rpm;
+export HAPROXY_RPM=/home/postgres/project_ha/haproxy_rpm;
+export KEEPALIVED_RPM=/home/postgres/project_ha/keepalived_rpm;
+# pg_vars
+export PGPASS=/home/postgres/project_ha/env/pgpass.txt
+export PGDATA=/dbhome/postgres/pgdata/son/
+export PG_VER="14"
+export BIN_DIR=/opt/pgpro/std-${PG_VER}/bin
+export PG_HBA_CONF=/home/postgres/project_ha/env/pg_hba.conf
+export PG_HBA=$(cat $PG_HBA_CONF);
+# sample_vars
+export HAPROXY_DEF_CONF=/home/postgres/project_ha/env/haproxy.cfg_default
+export PATRONI_YML=/home/postgres/project_ha/env/patroni.yml;
+export HAPROXY_CONF=/home/postgres/project_ha/env/haproxy.cfg
+export IP_VIP="192.168.44.121"
+export NET_INT="ens160"
+
+# для всех
+ALL_HOSTS
+sudo firewall-cmd --add-port={80,2379,2380}/tcp --permanent;
+sudo setenforce 0;
+sudo sed -i 's/^SELINUX=.*/SELINUX=permissive/g' /etc/selinux/config;
+sudo firewall-cmd --reload;
+sudo systemctl daemon-reload;
+sudo mv /etc/etcd/etcd.conf /etc/etcd/etcd.conf_;
+
+
+ETCD_1
+generator_etcd.sh
+
+cat etcd.conf << EOF
+#[Member]
+ETCD_DATA_DIR="/var/lib/etcd"
+ETCD_LISTEN_PEER_URLS="http://0.0.0.0:2380"
+ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:2379"
+ETCD_NAME="$1"
+ETCD_HEARTBEAT_INTERVAL="1000"
+ETCD_ELECTION_TIMEOUT="5000"
+#[Clustering]
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://${1}:2380"
+ETCD_ADVERTISE_CLIENT_URLS="http://${1}:2379"
+ETCD_INITIAL_CLUSTER="etcd_n1=http://${1}:2380"
+ETCD_INITIAL_CLUSTER_TOKEN="dba"
+ETCD_INITIAL_CLUSTER_STATE="new"
+\
+EOF
+
+sudo systemctl start etcd.service;
+sudo systemctl enable etcd.service;
+etcdctl cluster-health
+
+etcdctl member add etcd_n2 http://${2}:2380
+
+ETCD_2

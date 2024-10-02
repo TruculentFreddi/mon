@@ -1,0 +1,191 @@
+env/vars.txt
+# host_vars
+export PATRONI_HOSTS=/home/postgres/project_ha/env/patroni_hosts.txt
+export ETCD_HOSTS=$(cat /home/postgres/project_ha/env/etcd_hosts.txt);
+export PATRONI_IP=/home/postgres/project_ha/env/patroni_ip.txt
+export HOSTS=/home/postgres/project_ha/env/hosts;
+# rpm_vars
+export PATRONI_RPM=/home/postgres/project_ha/patroni_rpm;
+export POSTGRES_RPM=/home/postgres/project_ha/pgpro_${PG_VER}_rpm;
+export HAPROXY_RPM=/home/postgres/prohect_ha/haproxy_rpm;
+export KEEPALIVED_RPM=/home/postgres/prohect_ha/keepalived_rpm;
+# pg_vars
+export PGPASS=/home/postgres/project_ha/env/pgpass.txt
+export PGDATA=/dbhome/postgres/pgdata/son/
+export PG_VER="14"
+export BIN_DIR=/opt/pgpro/std-${PG_VER}/bin
+export PG_HBA_CONF=/home/postgres/project_ha/env/pg_hba.conf
+export PG_HBA=$(cat $PG_HBA_CONF);
+# sample_vars
+export HAPROXY_DEF_CONF=/home/postgres/project_ha/env/haproxy.cfg_default
+export PATRONI_YML=/home/postgres/project_ha/env/patroni.yml;
+export HAPROXY_CONF=/home/postgres/project_ha/env/haproxy.cfg
+export IP_VIP="192.168.44.121"
+export NET_INT="ens160"
+
+# pg_hba in patroni.yml format
+echo " - local   all             postgres                                trust
+ - host    all             all             127.0.0.1/32            md5" > $PG_HBA_CONF;
+for H in $(cat $PATRONI_HOSTS); do
+for IP in $(cat $PATRONI_IP | grep "$H" | awk -F ' ' '{print $1}'); do
+echo " - host    all             postgres        $IP/32       md5" >> $PG_HBA_CONF;
+done
+done
+echo " - host    all             all             ::1/128                 md5
+ - local   replication     all                                     trust
+ - host    replication     all             127.0.0.1/32            md5" >> $PG_HBA_CONF;
+for H in $(cat $PATRONI_HOSTS); do
+for IP in $(cat $PATRONI_IP | grep "$H" | awk -F ' ' '{print $1}'); do
+echo " - host    replication     postgres        $IP/32       md5" >> $PG_HBA_CONF;
+done
+done
+echo " - host    replication     all             ::1/128                 md5" >> $PG_HBA_CONF;
+
+# gen patroni.yml
+for H in $(cat $PATRONI_HOSTS); 
+do cat $PATRONI_YML | sed -e "s|NODE_NAME|$H|g" | sed -e "s|NODE_HOST|$H|g" | sed -e "s|ETCD_HOST|${ETCD_HOSTS}|g" | awk -v pg_hba="$PG_HBA" '{sub(/PG_HBA/,pg_hba); print}' | sed -e "s|DIR_CONF|${PGDATA}|g" | sed -e "s|BIN_DIR|${BIN_DIR}|g" | sed -e "s|PGDATA|${PGDATA}|g" > env/${H}_patroni.yml; done
+
+# haproxy.conf
+cat $HAPROXY_DEF_CONF > $HAPROXY_CONF;
+for H in $(cat $PATRONI_HOSTS); do
+echo " server $H $H:5432 maxconn 100 check port 8008" >> $HAPROXY_CONF;
+done
+
+
+# gen keepalived.conf
+
+. /home/postgres/project_ha/env/vars.txt
+
+set -- $(cat $PATRONI_HOSTS);
+export IP_1=$(cat $PATRONI_IP | grep $1 | awk -F ' ' '{print $1}');
+export IP_2=$(cat $PATRONI_IP | grep $2 | awk -F ' ' '{print $1}');
+export IP_3=$(cat $PATRONI_IP | grep $3 | awk -F ' ' '{print $1}');
+
+cat > ${1}_keepalived.conf << EOF
+vrrp_instance VI_1 {
+    state MASTER
+    interface $NET_INT
+    virtual_router_id 33
+    priority 200
+    unicast_src_ip $IP_1
+    unicast_peer {
+        $IP_2
+        $IP_3
+    }
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass 1111
+    }
+    virtual_ipaddress {
+         $IP_VIP dev $NET_INT label ${NET_INT}:2
+    }
+}
+EOF
+
+cat > ${2}_keepalived.conf << EOF
+vrrp_instance VI_1 {
+    state BACKUP
+    interface $NET_INT
+    virtual_router_id 33
+    priority 100
+    unicast_src_ip $IP_2
+    unicast_peer {
+        $IP_1
+        $IP_3
+    }
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass 1111
+    }
+    virtual_ipaddress {
+         $IP_VIP dev $NET_INT label ${NET_INT}:2
+    }
+}
+EOF
+
+cat > ${3}_keepalived.conf << EOF
+vrrp_instance VI_1 {
+    state BACKUP
+    interface $NET_INT
+    virtual_router_id 33
+    priority 100
+    unicast_src_ip $IP_3
+    unicast_peer {
+        $IP_1
+        $IP_2
+    }
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass 1111
+    }
+    virtual_ipaddress {
+         $IP_VIP dev $NET_INT label ${NET_INT}:2
+    }
+}
+EOF
+
+#
+
+#for H in $(cat $PATRONI_HOSTS); do
+#scp -r $POSTGRES_RPM $H:/home/postgres/ >/dev/null;
+#scp -r $PATRONI_RPM $H:/home/postgres/ >/dev/null;
+#scp /home/postgre/project_ha/env/${H}_patroni.yml $H:/home/postgres >/dev/null;
+#ssh -T $H << EOF
+#sudo yum -y install /home/postgres/patroni_rpm/*.yml >/dev/null;
+#sudo yum -y install /home/postgres/pgpro_${PG_VER}_rpm/*.yml >/dev/null;
+#sudo cp /home/postgres/${H}_patroni.yml /etc/patroni/patroni.yml >/dev/null;
+#sudo mkdir -p $PGDATA;
+#sudo chown -R postgres:postgres /dbhome/;
+#initdb -D $PGDATA -g >/dev/null;
+#sudo systemctl stop postgrespro-std-${PG_VER};
+#sudo echo "$PGDATA" > /etc/default/postgrespro-std-${PG_VER};
+#sudo systemctl start postgrespro-std-${PG_VER};
+#sudo systemctl enable postgrespro-std-${PG_VER};
+#sudo firewall-cmd -zone=public --permanent --add-port={5432,5000,8008}/tcp;
+#sudo systemctl stop patroni.service;
+#sudo systemctl start patroni.service;
+#sudo systemctl enable patroni.service;
+#EOF
+
+for H in $(cat $PATRONI_HOSTS); do			#
+scp -r $POSTGRES_RPM $H:/home/postgres/ >/dev/null;	# copy all rpm
+scp -r $PATRONI_RPM $H:/home/postgres/ >/dev/null;	#
+scp -r $HAPROXY_RPM $H:/home/postgres/ >/dev/null;	#
+scp -r $KEEPALIVED_RPM $H:/home/postgres/ >/dev/null;	#			
+scp /home/postgre/project_ha/env/${H}_patroni.yml $H:/home/postgres >/dev/null;     # copy conf/yml file
+scp /home/postgre/project_ha/env/${H}_keepalived.conf $H:/home/postgres >/dev/null; #
+scp $HAPROXY_CONF $H:/home/postgres >/dev/null;					    #
+ssh -T $H << EOF
+sudo yum -y install /home/postgres/patroni_rpm/*.rpm >/dev/null;           # install all rpm
+sudo yum -y install /home/postgres/pgpro_${PG_VER}_rpm/*.yml >/dev/null;   #
+sudo yum -y install /home/postgres/haproxy_rpm/*.rpm >/dev/null;	   #
+sudo yum -y install /home/postgres/keepalived_rpm/*.rpm >/dev/null;	   #
+sudo mkdir -p $PGDATA;
+sudo chown -R postgres:postgres /dbhome/;
+initdb -D $PGDATA -g >/dev/null;
+sudo echo "$PGDATA" > /etc/default/postgrespro-std-${PG_VER};
+sudo systemctl stop postgrespro-std-${PG_VER};
+sudo systemctl stop patroni.service;
+sudo systemctl stop haproxy.service;
+sudo systemctl stop keepalived.service;
+sudo firewall-cmd -zone=public --permanent --add-port={5432,5000,8008}/tcp;
+sudo cp /home/postgres/${H}_patroni.yml /etc/patroni/patroni.yml;
+sudo mv /etc/keepalived.conf /etc/keepalived.conf_;
+sudo cp /home/postgres/${H}_keepalived.conf /etc/keepalived/;
+sudo mv /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.conf.def;
+sudo cp /home/postgres/haproxy.cfg /etc/haproxy/;
+sudo systemctl start postgrespro-std-${PG_VER};
+sudo systemctl start patroni.service;
+sudo systemctl start haproxy.service;
+sudo systemctl start keepalived.service;
+sudo systemctl enable postgrespro-std-${PG_VER};
+sudo systemctl enable patroni.service;
+sudo systemctl enable haproxy.service;
+sudo systemctl enable keepalived.service;
+EOF
+done
+
+

@@ -1,0 +1,115 @@
+name: NODE_NAME
+namespace: /etc/patroni
+scope: postgres_new
+restapi:
+  listen: 0.0.0.0:8008
+  connect_address: NODE_HOST:8008
+  authentication:
+   username: patroni
+   password: patroni
+etcd:
+ hosts: ETCD_HOST
+ username: root
+ password: postgres
+bootstrap:
+ dcs:
+  ttl: 30
+  loop_wait: 10
+  retry_timeout: 10
+  maximum_lag_on_failover: 1048576
+  master_start_timeout: 10
+  postgresql:
+   use_pg_rewind: true
+   use_slots: true
+   parameters:
+    wal_level: replica
+    hot_standby: "on"
+    wal_keep_segments: 8
+    max_wal_senders: 5
+    max_replication_slots: 5
+    checkpoint_timeout: 30
+ initdb:
+ - encoding: UTF8
+ - data-checksums
+ - locale: en_US.UTF-8
+ pg_hba:
+PG_HBA
+ users:
+  usr1cv8:
+   password: postgres
+   options:
+    - superuser
+postgresql:
+ listen: 0.0.0.0:5432
+ connect_address: NODE_HOST:5432
+ config_dir: DIR_CONF
+ bin_dir: BIN_DIR
+ data_dir: PGDATA
+ pgpass: /tmp/pgpass
+ authentication:
+   superuser:
+     username: postgres
+     password: postgres
+   replication:
+     username: postgres
+     password: postgres
+   rewind:
+     username: postgres
+     password: postgres
+ parameters:
+    max_connections: 200
+    dynamic_shared_memory_type: posix
+    seq_page_cost: 0.1
+    random_page_cost: 0.1
+    cpu_operator_cost: 0.0025
+    logging_collector: on
+    log_timezone: 'Europe/Moscow'
+    datestyle: 'iso, dmy'
+    timezone: 'Europe/Moscow'
+    lc_messages: 'en_US.UTF-8'
+    lc_monetary: 'en_US.UTF-8'
+    lc_numeric: 'en_US.UTF-8'
+    lc_time: 'en_US.UTF-8'
+    default_text_search_config: 'pg_catalog.english'
+    temp_buffers: 128MB
+    max_files_per_process: 10000
+    commit_delay: 1000
+    from_collapse_limit: 8
+    join_collapse_limit: 8
+    autovacuum_max_workers: 4 
+    vacuum_cost_limit: 200 
+    autovacuum_naptime: 10s
+    autovacuum_vacuum_scale_factor: 0.01
+    autovacuum_analyze_scale_factor: 0.005
+    max_locks_per_transaction: 512
+    escape_string_warning: off
+    standard_conforming_strings: off
+    shared_preload_libraries: 'online_analyze, plantuner'
+    online_analyze.threshold: 50
+    online_analyze.scale_factor: 0.1
+    online_analyze.enable: on
+    online_analyze.verbose: off
+    online_analyze.min_interval: 10000
+    online_analyze.table_type: 'temporary'
+    plantuner.fix_empty_table: on
+    shared_buffers: 500MB
+    effective_cache_size: 1GB
+    maintenance_work_mem: 500MB
+    checkpoint_completion_target: 0.9
+    wal_buffers: 16MB
+    default_statistics_target: 500
+    effective_io_concurrency: 200
+    work_mem: 13981kB
+    min_wal_size: 2GB
+    max_wal_size: 8GB
+    max_worker_processes: 12
+    max_parallel_workers_per_gather: 6
+    max_parallel_workers: 12
+    max_parallel_maintenance_workers: 4
+    log_directory: /dbhome/postgres/pgdata/log/
+    log_filename: postgres_%d.log
+tags:
+  nofailover: false
+  noloadbalance: false
+  clonefrom: false
+  nosync: false

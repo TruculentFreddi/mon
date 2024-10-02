@@ -1,0 +1,51 @@
+#export PATRONI_HOSTS=/home/postgres/project_ha/env/patroni_hosts.txt
+#export ETCD_HOSTS=$(cat /home/postgres/project_ha/env/etcd_hosts.txt);
+#export PATRONI_YML=/home/postgres/project_ha/env/patroni.yml;
+#export HOSTS=/home/postgres/project_ha/env/hosts;
+#export PATRONI_RPM=/home/postgres/project_ha/patroni_rpm;
+#export POSTGRES_RPM=/home/postgres/project_ha/pgpro_${PG_VER}_rpm;
+#export HAPROXY_RPM=/home/postgres/prohect_ha/haproxy_rpm;
+#export KEEPALIVED_RPM=/home/postgres/prohect_ha/keepalived_rpm;
+#export PGPASS=/home/postgres/project_ha/env/pgpass.txt
+#export PGDATA=/dbhome/postgres/pgdata/son/
+#export PG_VER="14"
+#export BIN_DIR=/opt/pgpro/std-${PG_VER}/bin
+#export PATRONI_IP=/home/postgres/project_ha/env/patroni_ip.txt
+#export PG_HBA_CONF=/home/postgres/project_ha/env/pg_hba.conf
+#export PG_HBA=$(cat $PG_HBA_CONF);
+#export HAPROXY_CONF=/home/postgres/project_ha/env/haproxy.cfg
+#export HAPROXY_DEF_CONF=/home/postgres/project_ha/env/haproxy.cfg_default
+
+# host_vars
+export PATRONI_HOSTS=/home/postgres/project_ha/env/patroni_hosts.txt
+export ETCD_HOSTS=$(cat /home/postgres/project_ha/env/etcd_hosts.txt);
+export ETCD_HOSTS_FCL=/home/postgres/project_ha/env/etcd_hosts.txt;
+export ETCD_CLUSTER=/home/postgres/project_ha/env/etcd_cluster.txt;
+export PATRONI_IP=/home/postgres/project_ha/env/patroni_ip.txt
+export HOSTS=/home/postgres/project_ha/env/hosts;
+# rpm_vars
+export PATRONI_RPM=/home/postgres/project_ha/patroni_rpm;
+export POSTGRES_RPM="/home/postgres/project_ha/pgpro_${PG_VER}_rpm";
+export HAPROXY_RPM=/home/postgres/project_ha/haproxy_rpm;
+export KEEPALIVED_RPM=/home/postgres/project_ha/keepalived_rpm;
+export ETCD_RPM=/home/postgres/project_ha/etcd_rpm;
+# pg_vars
+export PGPASS=/home/postgres/project_ha/env/pgpass.txt
+export PGDATA=/pgdata/
+export LOG_DIR=/dbhome/postgres/pgdata/log/
+export PG_VER=14
+export BIN_DIR=/opt/pgpro/std-${PG_VER}/bin
+export PG_HBA_CONF=/home/postgres/project_ha/env/pg_hba.conf
+export PG_HBA=$(cat $PG_HBA_CONF);
+# sample_vars
+export HAPROXY_DEF_CONF=/home/postgres/project_ha/env/haproxy.cfg_default
+export PATRONI_YML=/home/postgres/project_ha/env/patroni.yml;
+export HAPROXY_CONF=/home/postgres/project_ha/env/haproxy.cfg
+export IP_VIP="192.168.44.121"
+export NET_INT="ens160"
+
+set $(cat $ETCD_HOSTS_FCL);
+export ETCD_1=$1;
+export ETCD_2=$2;
+export ETCD_3=$3;
+

@@ -1,0 +1,47 @@
+#!/bin/bash
+. /home/postgres/project_ha/env/vars.txt
+
+#cat $PATRONI_HOSTS
+#ans1
+#ans2
+#ans3
+
+#cat $PATRONI_IP
+#192.168.44.151 ans1
+#192.168.44.152 ans2
+#192.168.44.153 ans3
+
+#for H in $(cat $PATRONI_HOSTS); do
+#for IP in $(cat $PATRONI_IP | grep "$H" | awk -F ' ' '{print $1}'); do
+
+set -- $(cat $PATRONI_HOSTS);
+export IP_1=$(cat $PATRONI_IP | grep $1 | awk -F ' ' '{print $1}');
+export IP_2=$(cat $PATRONI_IP | grep $2 | awk -F ' ' '{print $1}');
+export IP_3=$(cat $PATRONI_IP | grep $3 | awk -F ' ' '{print $1}');
+
+echo "vrrp_instance VI_1 {
+    state MASTER
+    unicast_src_ip $IP_1
+    unicast_peer {
+        $IP_2
+        $IP_3
+ }    
+}" > ${1}_keepalived.conf;
+
+echo "vrrp_instance VI_1 {
+    state BACKUP
+    unicast_src_ip $IP_2
+    unicast_peer {
+        $IP_1
+        $IP_3
+    }
+}" > ${2}_keepalived.conf;
+
+echo "vrrp_instance VI_1 {
+    state BACKUP
+    unicast_src_ip $IP_3
+    unicast_peer {
+        $IP_1
+        $IP_2
+ }    
+}" > ${3}_keepalived.conf;
